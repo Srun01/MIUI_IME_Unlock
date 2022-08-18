@@ -10,6 +10,10 @@ class MainHook : IXposedHookLoadPackage {
             "com.sohu.inputmethod.sogou.xiaomi", "com.baidu.input_mi", "com.miui.catcherpatch"
     )
 
+    private var setColor: Int? = null
+
+    private var color = 0
+
     override fun handleLoadPackage(lpparam: LoadPackageParam) {
         //检查是否支持全面屏优化
         if (PropertyUtils["ro.miui.support_miui_ime_bottom", "0"] != "1") return
@@ -31,16 +35,33 @@ class MainHook : IXposedHookLoadPackage {
                 hookSIsImeSupport(it)
                 hookIsXiaoAiEnable(it)
 
+
                 //将导航栏颜色赋值给输入法优化的底图
                 findAndHookMethod("com.android.internal.policy.PhoneWindow",
                         lpparam.classLoader, "setNavigationBarColor",
                         Int::class.java, object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val color = -0x1 - param.args[0] as Int
-                        XposedHelpers.callStaticMethod(
-                                it, "customizeBottomViewColor",
-                                true, param.args[0], color or -0x1000000, color or 0x66000000
-                        )
+                        setColor = param.args[0] as Int
+                        color = -0x1 - setColor as Int
+
+                        setColor?.let { _ ->
+                            XposedHelpers.callStaticMethod(
+                                    it, "customizeBottomViewColor",
+                                    true, setColor, color or -0x1000000, color or 0x66000000
+                            )
+                        }
+                    }
+                })
+
+                findAndHookMethod("com.android.internal.policy.PhoneWindow",
+                        lpparam.classLoader, "getNavigationBarColor", object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        setColor?.let { setColor ->
+                            XposedHelpers.callStaticMethod(
+                                    it, "customizeBottomViewColor",
+                                    true, setColor, color or -0x1000000, color or 0x66000000
+                            )
+                        }
                     }
                 })
             }
